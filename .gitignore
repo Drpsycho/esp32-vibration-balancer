@@ -1,0 +1,27 @@
+.DS_Store
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Arduino IDE / arduino-cli
+build/
+dist/
+*.bin
+*.elf
+*.hex
+*.map
+*.lst
+
+# Editor / IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# OS / temp
+Thumbs.db
+*.tmp
+*.temp
+*.swp
+*.swo
