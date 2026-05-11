@@ -4,23 +4,14 @@
 #include <Adafruit_ADXL345_U.h>
 #include <U8g2lib.h>
 
-// Default wiring:
-// ESP32-C3: SDA=5, SCL=6.
-// STM32F103C8T6: SDA=PB7, SCL=PB6.
+// STM32F103C8T6 + LILUDIN 0.91" 128x32 blue/white OLED:
+// I2C1: SDA=PB7, SCL=PB6, OLED address 0x3C.
 #ifndef I2C_SDA_PIN
-#if defined(ARDUINO_ARCH_STM32)
 #define I2C_SDA_PIN PB7
-#else
-#define I2C_SDA_PIN 5
-#endif
 #endif
 
 #ifndef I2C_SCL_PIN
-#if defined(ARDUINO_ARCH_STM32)
 #define I2C_SCL_PIN PB6
-#else
-#define I2C_SCL_PIN 6
-#endif
 #endif
 
 #ifndef OLED_ADDR_7BIT
@@ -31,42 +22,20 @@
 #define ADXL345_ADDR_7BIT 0x53
 #endif
 
-// Use the built-in LED if the selected board defines it.
-// Otherwise set this to the GPIO where the external LED is connected.
 #ifndef LED_BUILTIN
-static constexpr uint8_t LED_PIN = 8;
+static constexpr uint8_t LED_PIN = PC13;
 #else
 static constexpr uint8_t LED_PIN = LED_BUILTIN;
 #endif
 
-// STM32F103C8T6 board LED on PC13 is usually active-low.
+// Most STM32F103C8T6 boards have an active-low LED on PC13.
 #ifndef LED_ACTIVE_LOW
-#if defined(ARDUINO_ARCH_STM32)
 #define LED_ACTIVE_LOW 1
-#else
-#define LED_ACTIVE_LOW 0
-#endif
 #endif
 
-// Display selection. Keep DISPLAY_72X40 enabled for the ESP32-C3 72x40 OLED.
-// Set DISPLAY_72X40 to 0 for a classic 0.91" 128x32 I2C SSD1306 OLED.
-#ifndef DISPLAY_72X40
-#define DISPLAY_72X40 1
-#endif
-
-#if DISPLAY_72X40
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE, I2C_SCL_PIN, I2C_SDA_PIN);
-static constexpr int16_t DRAW_X_OFFSET = 28;
-static constexpr int16_t DRAW_Y_OFFSET = 0;
-static constexpr int16_t VISIBLE_WIDTH = 72;
-static constexpr int16_t VISIBLE_HEIGHT = 40;
-#else
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE, I2C_SCL_PIN, I2C_SDA_PIN);
 static constexpr int16_t DRAW_X_OFFSET = 0;
 static constexpr int16_t DRAW_Y_OFFSET = 0;
-static constexpr int16_t VISIBLE_WIDTH = 128;
-static constexpr int16_t VISIBLE_HEIGHT = 32;
-#endif
 
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
@@ -85,8 +54,12 @@ uint32_t lastSampleMs = 0;
 uint32_t lastScreenMs = 0;
 bool adxlOk = false;
 
+static void writeLed(bool on) {
+  digitalWrite(LED_PIN, LED_ACTIVE_LOW ? !on : on);
+}
+
 static void startPulse() {
-  digitalWrite(LED_PIN, LED_ACTIVE_LOW ? LOW : HIGH);
+  writeLed(true);
   ledOffAtMs = millis() + LED_PULSE_MS;
 }
 
@@ -101,11 +74,7 @@ static void drawStatus(const char *status) {
   display.print("X ");
   display.print(xNow, 2);
 
-#if DISPLAY_72X40
-  display.setCursor(DRAW_X_OFFSET, DRAW_Y_OFFSET + 34);
-#else
   display.setCursor(DRAW_X_OFFSET + 64, DRAW_Y_OFFSET + 20);
-#endif
   display.print("Max ");
   display.print(xMax, 2);
   display.sendBuffer();
@@ -130,15 +99,13 @@ void setup() {
   delay(300);
 
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LED_ACTIVE_LOW ? HIGH : LOW);
+  writeLed(false);
 
 #if defined(ARDUINO_ARCH_STM32)
   Wire.setSDA(I2C_SDA_PIN);
   Wire.setSCL(I2C_SCL_PIN);
-  Wire.begin();
-#else
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 #endif
+  Wire.begin();
   Wire.setClock(400000);
 
   display.setI2CAddress(OLED_ADDR_7BIT << 1);
@@ -161,7 +128,7 @@ void loop() {
   const uint32_t now = millis();
 
   if (ledOffAtMs != 0 && static_cast<int32_t>(now - ledOffAtMs) >= 0) {
-    digitalWrite(LED_PIN, LED_ACTIVE_LOW ? HIGH : LOW);
+    writeLed(false);
     ledOffAtMs = 0;
   }
 

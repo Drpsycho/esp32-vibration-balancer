@@ -71,7 +71,11 @@ static void drawStatus(const char *status) {
   display.print("X ");
   display.print(xNow, 2);
 
+#if DISPLAY_72X40
   display.setCursor(DRAW_X_OFFSET, DRAW_Y_OFFSET + 34);
+#else
+  display.setCursor(DRAW_X_OFFSET + 64, DRAW_Y_OFFSET + 20);
+#endif
   display.print("Max ");
   display.print(xMax, 2);
   display.sendBuffer();
@@ -150,4 +154,3 @@ void loop() {
     drawStatus(adxlOk ? "ADXL345 X" : "No ADXL");
   }
 }
-
