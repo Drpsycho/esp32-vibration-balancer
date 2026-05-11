@@ -177,22 +177,24 @@
     <span class="tag">STM32F103C8T6 + OLED 0.91&quot; 128x32</span>
     <h1>Как прошить проект в STM32F103C8T6</h1>
     <p class="lead">
-      Инструкция для текущего проекта <code>/Users/dr/work/arduino</code>.
+      Инструкция рассчитана на Windows: проект можно распаковать в любую удобную папку, без привязки к абсолютным путям автора.
       Основной вариант прошивки - через USB-UART и встроенный загрузчик STM32. ST-Link V2 описан ниже как запасной вариант.
     </p>
 
     <section class="box ok">
       <h2>Коротко</h2>
       <ol>
+        <li>Установить <code>PlatformIO Core</code> или <code>VS Code + PlatformIO IDE</code>.</li>
+        <li>Распаковать проект в папку без кириллицы и пробелов, например <code>stm32-oled</code>.</li>
+        <li>Открыть <code>PowerShell</code> или <code>Terminal</code> в папке проекта.</li>
         <li>Подключить USB-UART адаптер к <code>PA9/PA10</code>.</li>
         <li>Поставить <code>BOOT0 = 1</code> и нажать <code>Reset</code>.</li>
         <li>Узнать порт командой <code>pio device list</code>.</li>
         <li>Выполнить команду прошивки, указав найденный порт.</li>
         <li>Вернуть <code>BOOT0 = 0</code> и снова нажать <code>Reset</code>.</li>
       </ol>
-      <pre><code>cd /Users/dr/work/arduino
-pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/cu.usbserial-XXXX</code></pre>
+      <pre><code>pio device list
+pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
     </section>
 
     <h2>Что прошиваем</h2>
@@ -201,7 +203,18 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/
     <p>Запасное окружение для ST-Link: <code>stm32-bluepill-f103c8-oled-128x32-stlink</code>.</p>
     <p>Плата в конфиге PlatformIO: <code>bluepill_f103c8</code>.</p>
     <p>Файл прошивки после сборки:</p>
-    <pre><code>/Users/dr/work/arduino/.pio/build/stm32-bluepill-f103c8-oled-128x32/firmware.bin</code></pre>
+    <pre><code>.pio\build\stm32-bluepill-f103c8-oled-128x32\firmware.bin</code></pre>
+
+    <h2>Подготовка Windows</h2>
+    <ol>
+      <li>Установить <code>Python 3</code> с python.org и отметить галочку <code>Add python.exe to PATH</code>.</li>
+      <li>Установить <code>PlatformIO Core</code> командой <code>py -m pip install -U platformio</code> или поставить расширение <code>PlatformIO IDE</code> в VS Code.</li>
+      <li>Если USB-UART адаптер не появляется как <code>COM</code>-порт, установить драйвер для его чипа: обычно <code>CH340</code>, <code>CP210x</code> или <code>FTDI</code>.</li>
+      <li>Открыть терминал именно в папке проекта. Если терминал открыт в другом месте, сначала перейти командой <code>cd /d &lt;путь-к-папке-проекта&gt;</code>.</li>
+    </ol>
+
+    <p>Проверка, что PlatformIO доступен из терминала:</p>
+    <pre><code>pio --version</code></pre>
 
     <h2>Способ 1: USB-UART через встроенный bootloader</h2>
     <p>Это основной способ, если ST-Link нет. Понадобится USB-UART адаптер с логикой <strong>3.3V</strong>.</p>
@@ -254,9 +267,10 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/
       <li>Нажать <code>Reset</code>, чтобы запустить прошитую программу.</li>
     </ol>
 
-    <pre><code>cd /Users/dr/work/arduino
-pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/cu.usbserial-XXXX</code></pre>
+    <pre><code>pio device list
+pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
+
+    <p>Вместо <code>COM3</code> укажи порт, который показала команда <code>pio device list</code>. На Windows это обычно <code>COM3</code>, <code>COM4</code> или другой номер.</p>
 
     <section class="box warn">
       <h3>Если UART-прошивка не стартует</h3>
@@ -315,8 +329,7 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/
 
     <h3>Команда прошивки через ST-Link</h3>
     <p>Так как в <code>platformio.ini</code> основным выбран serial bootloader, для ST-Link используется отдельное окружение:</p>
-    <pre><code>cd /Users/dr/work/arduino
-pio run -e stm32-bluepill-f103c8-oled-128x32-stlink --target upload</code></pre>
+    <pre><code>pio run -e stm32-bluepill-f103c8-oled-128x32-stlink --target upload</code></pre>
 
     <h2>Подключение OLED и ADXL345</h2>
     <p>Для текущей прошивки используется I2C1:</p>
@@ -385,9 +398,8 @@ pio run -e stm32-bluepill-f103c8-oled-128x32-stlink --target upload</code></pre>
     <section class="box ok">
       <h2>Главная команда</h2>
       <p>Для нашего проекта и STM32F103C8T6 через USB-UART bootloader:</p>
-      <pre><code>cd /Users/dr/work/arduino
-pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port /dev/cu.usbserial-XXXX</code></pre>
+      <pre><code>pio device list
+pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
     </section>
   </main>
 </body>
