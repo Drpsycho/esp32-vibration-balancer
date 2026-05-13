@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Прошивка STM32F103C8T6</title>
+  <title>README: STM32F103C8T6 + ADXL345</title>
   <style>
     :root {
       color-scheme: light;
@@ -161,6 +161,30 @@
       gap: 16px;
     }
 
+    details {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 18px 0;
+      padding: 0;
+    }
+
+    summary {
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: 700;
+      padding: 16px 18px;
+    }
+
+    summary:hover {
+      color: var(--accent);
+    }
+
+    .details-body {
+      border-top: 1px solid var(--line);
+      padding: 0 18px 18px;
+    }
+
     @media (max-width: 760px) {
       h1 {
         font-size: 28px;
@@ -174,11 +198,11 @@
 </head>
 <body>
   <main>
-    <span class="tag">STM32F103C8T6 + OLED 0.91&quot; 128x32</span>
-    <h1>Как прошить проект в STM32F103C8T6</h1>
+    <span class="tag">STM32F103C8T6 + ADXL345 + OLED 0.91&quot; 128x32</span>
+    <h1>README: прошивка и работа проекта</h1>
     <p class="lead">
       Инструкция рассчитана на Windows: проект можно распаковать в любую удобную папку, без привязки к абсолютным путям автора.
-      Основной вариант прошивки - через USB-UART и встроенный загрузчик STM32. ST-Link V2 описан ниже как запасной вариант.
+      Основной вариант прошивки - через ST-Link V2. USB-UART через встроенный загрузчик STM32 описан ниже как запасной вариант.
     </p>
 
     <section class="box ok">
@@ -187,106 +211,49 @@
         <li>Установить <code>PlatformIO Core</code> или <code>VS Code + PlatformIO IDE</code>.</li>
         <li>Распаковать проект в папку без кириллицы и пробелов, например <code>stm32-oled</code>.</li>
         <li>Открыть <code>PowerShell</code> или <code>Terminal</code> в папке проекта.</li>
-        <li>Подключить USB-UART адаптер к <code>PA9/PA10</code>.</li>
-        <li>Поставить <code>BOOT0 = 1</code> и нажать <code>Reset</code>.</li>
-        <li>Узнать порт командой <code>pio device list</code>.</li>
-        <li>Выполнить команду прошивки, указав найденный порт.</li>
-        <li>Вернуть <code>BOOT0 = 0</code> и снова нажать <code>Reset</code>.</li>
+        <li>Подключить ST-Link: <code>SWDIO</code>, <code>SWCLK</code>, <code>GND</code> и питание 3.3V.</li>
+        <li>Поставить <code>BOOT0 = 0</code>.</li>
+        <li>Выполнить сборку или прошивку. В <code>platformio.ini</code> ST-Link уже выбран по умолчанию.</li>
       </ol>
-      <pre><code>pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
+      <pre><code>pio run
+pio run --target upload</code></pre>
     </section>
 
     <h2>Что прошиваем</h2>
     <p>Камень: <strong>STM32F103C8T6</strong>.</p>
-    <p>Основное PlatformIO окружение: <code>stm32-bluepill-f103c8-oled-128x32</code>, прошивка через USB-UART bootloader.</p>
-    <p>Запасное окружение для ST-Link: <code>stm32-bluepill-f103c8-oled-128x32-stlink</code>.</p>
+    <p>Основное PlatformIO окружение: <code>stm32-bluepill-f103c8-oled-128x32-stlink</code>, прошивка через ST-Link V2.</p>
+    <p>Запасное окружение для USB-UART bootloader: <code>stm32-bluepill-f103c8-oled-128x32</code>.</p>
     <p>Плата в конфиге PlatformIO: <code>bluepill_f103c8</code>.</p>
     <p>Файл прошивки после сборки:</p>
-    <pre><code>.pio\build\stm32-bluepill-f103c8-oled-128x32\firmware.bin</code></pre>
+    <pre><code>.pio\build\stm32-bluepill-f103c8-oled-128x32-stlink\firmware.bin</code></pre>
+
+    <h2>Что делает прошивка</h2>
+    <ul>
+      <li>Читает ADXL345 по I2C на пинах <code>PB7/PB6</code>.</li>
+      <li>Показывает текущее значение <code>X</code> и последний пойманный пик <code>Max</code> на OLED.</li>
+      <li>Ловит локальный максимум сигнала: значение сначала растет, потом проседает на заданный порог.</li>
+      <li>На каждый такой пик один раз мигает светодиод <code>PC13</code> и один раз печатает максимум в Serial.</li>
+    </ul>
+    <pre><code>X peak max: 3.427</code></pre>
+
+    <p>Пороги в коде:</p>
+    <ul>
+      <li><code>PEAK_MIN_RISE</code> - насколько сигнал должен вырасти от нижней точки, чтобы начать считать пик.</li>
+      <li><code>PEAK_DROP</code> - насколько сигнал должен упасть после вершины, чтобы максимум был зафиксирован.</li>
+    </ul>
 
     <h2>Подготовка Windows</h2>
     <ol>
       <li>Установить <code>Python 3</code> с python.org и отметить галочку <code>Add python.exe to PATH</code>.</li>
       <li>Установить <code>PlatformIO Core</code> командой <code>py -m pip install -U platformio</code> или поставить расширение <code>PlatformIO IDE</code> в VS Code.</li>
-      <li>Если USB-UART адаптер не появляется как <code>COM</code>-порт, установить драйвер для его чипа: обычно <code>CH340</code>, <code>CP210x</code> или <code>FTDI</code>.</li>
       <li>Открыть терминал именно в папке проекта. Если терминал открыт в другом месте, сначала перейти командой <code>cd /d &lt;путь-к-папке-проекта&gt;</code>.</li>
     </ol>
 
     <p>Проверка, что PlatformIO доступен из терминала:</p>
     <pre><code>pio --version</code></pre>
 
-    <h2>Способ 1: USB-UART через встроенный bootloader</h2>
-    <p>Это основной способ, если ST-Link нет. Понадобится USB-UART адаптер с логикой <strong>3.3V</strong>.</p>
-
-    <h3>Подключение</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>USB-UART</th>
-          <th>STM32F103C8T6</th>
-          <th>Комментарий</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>TX</td>
-          <td>PA10 / RX1</td>
-          <td>Передача адаптера идет в прием STM32</td>
-        </tr>
-        <tr>
-          <td>RX</td>
-          <td>PA9 / TX1</td>
-          <td>Прием адаптера идет с передачи STM32</td>
-        </tr>
-        <tr>
-          <td>GND</td>
-          <td>GND</td>
-          <td>Общая земля обязательна</td>
-        </tr>
-        <tr>
-          <td>3.3V</td>
-          <td>3.3V</td>
-          <td>Если питаешь плату от адаптера</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <section class="box warn">
-      <h3>Важно по питанию</h3>
-      <p>STM32F103C8T6 работает от <strong>3.3V</strong>. Не подавай 5V на питание чипа и не подключай 5V-логические сигналы напрямую к I2C/UART.</p>
-    </section>
-
-    <h3>Порядок прошивки через UART</h3>
-    <ol>
-      <li>Поставить <code>BOOT0 = 1</code>.</li>
-      <li>Нажать <code>Reset</code> на плате или кратко отключить питание.</li>
-      <li>Посмотреть порт командой <code>pio device list</code>.</li>
-      <li>Прошить, указав найденный порт.</li>
-      <li>Вернуть <code>BOOT0 = 0</code>.</li>
-      <li>Нажать <code>Reset</code>, чтобы запустить прошитую программу.</li>
-    </ol>
-
-    <pre><code>pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
-
-    <p>Вместо <code>COM3</code> укажи порт, который показала команда <code>pio device list</code>. На Windows это обычно <code>COM3</code>, <code>COM4</code> или другой номер.</p>
-
-    <section class="box warn">
-      <h3>Если UART-прошивка не стартует</h3>
-      <ul>
-        <li>Проверь, что <code>BOOT0 = 1</code> именно до Reset.</li>
-        <li>Проверь перекрестное подключение: <code>TX -> PA10</code>, <code>RX -> PA9</code>.</li>
-        <li>Проверь, что адаптер в режиме 3.3V.</li>
-        <li>Закрой Serial Monitor перед прошивкой.</li>
-      </ul>
-    </section>
-
-    <p>Если нужно сначала только собрать без прошивки:</p>
-    <pre><code>pio run -e stm32-bluepill-f103c8-oled-128x32</code></pre>
-
-    <h2>Способ 2: ST-Link V2</h2>
-    <p>Этот способ оставлен как запасной. Он удобный, но требует отдельный ST-Link программатор.</p>
+    <h2>Способ 1: ST-Link V2</h2>
+    <p>Это основной способ для проекта. BOOT0 переключать в режим загрузчика не нужно.</p>
 
     <h3>Подключение</h3>
     <table>
@@ -327,9 +294,98 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3<
       <li><code>BOOT1 = 0</code>, если на плате есть такой джампер</li>
     </ul>
 
-    <h3>Команда прошивки через ST-Link</h3>
-    <p>Так как в <code>platformio.ini</code> основным выбран serial bootloader, для ST-Link используется отдельное окружение:</p>
-    <pre><code>pio run -e stm32-bluepill-f103c8-oled-128x32-stlink --target upload</code></pre>
+    <h3>Команды</h3>
+    <p>Так как ST-Link окружение выбрано по умолчанию, можно запускать короткие команды:</p>
+    <pre><code>pio run
+pio run --target upload</code></pre>
+
+    <p>То же самое в явном виде:</p>
+    <pre><code>pio run -e stm32-bluepill-f103c8-oled-128x32-stlink
+pio run -e stm32-bluepill-f103c8-oled-128x32-stlink --target upload</code></pre>
+
+    <section class="box warn">
+      <h3>Если ST-Link не прошивает</h3>
+      <ul>
+        <li>Проверь <code>SWDIO</code>, <code>SWCLK</code>, <code>GND</code>.</li>
+        <li>Проверь, что плата получает 3.3V питание.</li>
+        <li>Проверь, что <code>BOOT0 = 0</code>.</li>
+        <li>Попробуй нажать <code>Reset</code> перед командой upload.</li>
+      </ul>
+    </section>
+
+    <details>
+      <summary>Запасной способ: USB-UART через встроенный bootloader</summary>
+      <div class="details-body">
+        <p>Этот вариант нужен только если ST-Link нет. Понадобится USB-UART адаптер с логикой <strong>3.3V</strong>.</p>
+        <p>Если адаптер не появляется как <code>COM</code>-порт, установи драйвер для его чипа: обычно <code>CH340</code>, <code>CP210x</code> или <code>FTDI</code>.</p>
+
+        <h3>Подключение</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>USB-UART</th>
+              <th>STM32F103C8T6</th>
+              <th>Комментарий</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>TX</td>
+              <td>PA10 / RX1</td>
+              <td>Передача адаптера идет в прием STM32</td>
+            </tr>
+            <tr>
+              <td>RX</td>
+              <td>PA9 / TX1</td>
+              <td>Прием адаптера идет с передачи STM32</td>
+            </tr>
+            <tr>
+              <td>GND</td>
+              <td>GND</td>
+              <td>Общая земля обязательна</td>
+            </tr>
+            <tr>
+              <td>3.3V</td>
+              <td>3.3V</td>
+              <td>Если питаешь плату от адаптера</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <section class="box warn">
+          <h3>Важно по питанию</h3>
+          <p>STM32F103C8T6 работает от <strong>3.3V</strong>. Не подавай 5V на питание чипа и не подключай 5V-логические сигналы напрямую к I2C/UART.</p>
+        </section>
+
+        <h3>Порядок прошивки через UART</h3>
+        <ol>
+          <li>Поставить <code>BOOT0 = 1</code>.</li>
+          <li>Нажать <code>Reset</code> на плате или кратко отключить питание.</li>
+          <li>Посмотреть порт командой <code>pio device list</code>.</li>
+          <li>Прошить, указав найденный порт.</li>
+          <li>Вернуть <code>BOOT0 = 0</code>.</li>
+          <li>Нажать <code>Reset</code>, чтобы запустить прошитую программу.</li>
+        </ol>
+
+        <pre><code>pio device list
+pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
+
+        <p>Вместо <code>COM3</code> укажи порт, который показала команда <code>pio device list</code>. На Windows это обычно <code>COM3</code>, <code>COM4</code> или другой номер.</p>
+
+        <section class="box warn">
+          <h3>Если UART-прошивка не стартует</h3>
+          <ul>
+            <li>Проверь, что <code>BOOT0 = 1</code> именно до Reset.</li>
+            <li>Проверь перекрестное подключение: <code>TX -> PA10</code>, <code>RX -> PA9</code>.</li>
+            <li>Проверь, что адаптер в режиме 3.3V.</li>
+            <li>Закрой Serial Monitor перед прошивкой.</li>
+          </ul>
+        </section>
+
+        <p>Если нужно сначала только собрать без прошивки:</p>
+        <pre><code>pio run -e stm32-bluepill-f103c8-oled-128x32</code></pre>
+      </div>
+    </details>
 
     <h2>Подключение OLED и ADXL345</h2>
     <p>Для текущей прошивки используется I2C1:</p>
@@ -369,7 +425,8 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3<
     <ul>
       <li>На OLED должно появиться <code>Starting</code>, потом <code>ADXL OK</code> или <code>No ADXL</code>.</li>
       <li>Если датчик найден, экран показывает <code>X</code> и <code>Max</code>.</li>
-      <li>При новом максимуме по оси X светодиод на <code>PC13</code> коротко мигает.</li>
+      <li>При каждом локальном максимуме по оси X светодиод на <code>PC13</code> коротко мигает.</li>
+      <li>В Serial Monitor на каждый пик выводится одна строка <code>X peak max: ...</code>.</li>
     </ul>
 
     <h2>Диагностика</h2>
@@ -397,9 +454,8 @@ pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3<
 
     <section class="box ok">
       <h2>Главная команда</h2>
-      <p>Для нашего проекта и STM32F103C8T6 через USB-UART bootloader:</p>
-      <pre><code>pio device list
-pio run -e stm32-bluepill-f103c8-oled-128x32 --target upload --upload-port COM3</code></pre>
+      <p>Для нашего проекта и STM32F103C8T6 через ST-Link:</p>
+      <pre><code>pio run --target upload</code></pre>
     </section>
   </main>
 </body>

@@ -39,16 +39,19 @@ static constexpr int16_t DRAW_Y_OFFSET = 0;
 
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
-// Values are in m/s^2. Raise TRIGGER_STEP if the LED reacts too often.
-static constexpr float TRIGGER_STEP = 0.25f;
-static constexpr float RESET_DROP = 0.15f;
+// Values are in m/s^2. Raise PEAK_MIN_RISE if the LED reacts to noise.
+static constexpr float PEAK_MIN_RISE = 0.25f;
+static constexpr float PEAK_DROP = 0.15f;
 static constexpr uint32_t SAMPLE_PERIOD_MS = 50;
 static constexpr uint32_t LED_PULSE_MS = 80;
 static constexpr uint32_t SCREEN_PERIOD_MS = 100;
 
 float xNow = 0.0f;
-float xMax = -1000.0f;
-bool readyForNextPeak = true;
+float xMax = 0.0f;
+float xValley = 0.0f;
+float xPeakCandidate = 0.0f;
+bool haveSample = false;
+bool risingToPeak = false;
 uint32_t ledOffAtMs = 0;
 uint32_t lastSampleMs = 0;
 uint32_t lastScreenMs = 0;
@@ -91,6 +94,43 @@ static void scanI2cToSerial() {
       }
       Serial.println(addr, HEX);
     }
+  }
+}
+
+static void updatePeakDetector(float value) {
+  if (!haveSample) {
+    haveSample = true;
+    xValley = value;
+    xPeakCandidate = value;
+    xMax = value;
+    return;
+  }
+
+  if (!risingToPeak) {
+    if (value < xValley) {
+      xValley = value;
+    }
+
+    if (value >= xValley + PEAK_MIN_RISE) {
+      risingToPeak = true;
+      xPeakCandidate = value;
+    }
+    return;
+  }
+
+  if (value > xPeakCandidate) {
+    xPeakCandidate = value;
+  }
+
+  if (value <= xPeakCandidate - PEAK_DROP) {
+    xMax = xPeakCandidate;
+    risingToPeak = false;
+    xValley = value;
+    xPeakCandidate = value;
+
+    startPulse();
+    Serial.print("X peak max: ");
+    Serial.println(xMax, 3);
   }
 }
 
@@ -138,18 +178,7 @@ void loop() {
     sensors_event_t event;
     accel.getEvent(&event);
     xNow = event.acceleration.x;
-
-    if (readyForNextPeak && xNow > xMax + TRIGGER_STEP) {
-      xMax = xNow;
-      readyForNextPeak = false;
-      startPulse();
-      Serial.print("New X max: ");
-      Serial.println(xMax, 3);
-    }
-
-    if (xNow < xMax - RESET_DROP) {
-      readyForNextPeak = true;
-    }
+    updatePeakDetector(xNow);
   }
 
   if (now - lastScreenMs >= SCREEN_PERIOD_MS) {
