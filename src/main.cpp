@@ -4,7 +4,7 @@
 #include <Adafruit_ADXL345_U.h>
 #include <U8g2lib.h>
 
-// Default wiring:
+// Пины I2C по умолчанию:
 // ESP32-C3: SDA=5, SCL=6.
 // STM32F103C8T6: SDA=PB7, SCL=PB6.
 #ifndef I2C_SDA_PIN
@@ -31,15 +31,15 @@
 #define ADXL345_ADDR_7BIT 0x53
 #endif
 
-// Use the built-in LED if the selected board defines it.
-// Otherwise set this to the GPIO where the external LED is connected.
+// Берем встроенный светодиод, если он описан в выбранной плате.
+// Иначе используем внешний светодиод на GPIO 8.
 #ifndef LED_BUILTIN
 static constexpr uint8_t LED_PIN = 8;
 #else
 static constexpr uint8_t LED_PIN = LED_BUILTIN;
 #endif
 
-// STM32F103C8T6 board LED on PC13 is usually active-low.
+// На STM32F103C8T6 встроенный светодиод на PC13 обычно включается уровнем LOW.
 #ifndef LED_ACTIVE_LOW
 #if defined(ARDUINO_ARCH_STM32)
 #define LED_ACTIVE_LOW 1
@@ -48,8 +48,8 @@ static constexpr uint8_t LED_PIN = LED_BUILTIN;
 #endif
 #endif
 
-// Display selection. Keep DISPLAY_72X40 enabled for the ESP32-C3 72x40 OLED.
-// Set DISPLAY_72X40 to 0 for a classic 0.91" 128x32 I2C SSD1306 OLED.
+// Выбор OLED. DISPLAY_72X40=1 нужен для маленького ESP32-C3 OLED 72x40.
+// Для обычного SSD1306 0.91" 128x32 ставим DISPLAY_72X40=0.
 #ifndef DISPLAY_72X40
 #define DISPLAY_72X40 1
 #endif
@@ -58,25 +58,22 @@ static constexpr uint8_t LED_PIN = LED_BUILTIN;
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE, I2C_SCL_PIN, I2C_SDA_PIN);
 static constexpr int16_t DRAW_X_OFFSET = 28;
 static constexpr int16_t DRAW_Y_OFFSET = 0;
-static constexpr int16_t VISIBLE_WIDTH = 72;
-static constexpr int16_t VISIBLE_HEIGHT = 40;
 #else
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE, I2C_SCL_PIN, I2C_SDA_PIN);
 static constexpr int16_t DRAW_X_OFFSET = 0;
 static constexpr int16_t DRAW_Y_OFFSET = 0;
-static constexpr int16_t VISIBLE_WIDTH = 128;
-static constexpr int16_t VISIBLE_HEIGHT = 32;
 #endif
 
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
-// Values are in m/s^2. Raise PEAK_MIN_RISE if the LED reacts to noise.
+// Значения в m/s^2. Если светодиод реагирует на шум, увеличьте PEAK_MIN_RISE.
 static constexpr float PEAK_MIN_RISE = 0.25f;
 static constexpr float PEAK_DROP = 0.15f;
 static constexpr uint32_t SAMPLE_PERIOD_MS = 50;
 static constexpr uint32_t LED_PULSE_MS = 80;
 static constexpr uint32_t SCREEN_PERIOD_MS = 100;
 
+// Состояние простого детектора пиков по оси X.
 float xNow = 0.0f;
 float xMax = 0.0f;
 float xValley = 0.0f;
@@ -129,6 +126,7 @@ static void scanI2cToSerial() {
 }
 
 static void updatePeakDetector(float value) {
+  // Первый замер только инициализирует базовые уровни, пика еще нет.
   if (!haveSample) {
     haveSample = true;
     xValley = value;
@@ -138,10 +136,12 @@ static void updatePeakDetector(float value) {
   }
 
   if (!risingToPeak) {
+    // Пока не растем к пику, запоминаем самую низкую точку.
     if (value < xValley) {
       xValley = value;
     }
 
+    // Рост от впадины больше порога считаем началом нового пика.
     if (value >= xValley + PEAK_MIN_RISE) {
       risingToPeak = true;
       xPeakCandidate = value;
@@ -149,10 +149,12 @@ static void updatePeakDetector(float value) {
     return;
   }
 
+  // На подъеме обновляем кандидата в пик.
   if (value > xPeakCandidate) {
     xPeakCandidate = value;
   }
 
+  // Когда значение достаточно упало от кандидата, фиксируем пик.
   if (value <= xPeakCandidate - PEAK_DROP) {
     xMax = xPeakCandidate;
     risingToPeak = false;
